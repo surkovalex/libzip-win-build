@@ -1,6 +1,6 @@
 /*
   zip_crypto_commoncrypto.c -- CommonCrypto wrapper.
-  Copyright (C) 2018 Dieter Baron and Thomas Klausner
+  Copyright (C) 2018-2019 Dieter Baron and Thomas Klausner
 
   This file is part of libzip, a library to manipulate ZIP archives.
   The authors can be contacted at <libzip@nih.at>
@@ -43,7 +43,7 @@
 void
 _zip_crypto_aes_free(_zip_crypto_aes_t *aes) {
     if (aes == NULL) {
-	return;
+        return;
     }
 
     CCCryptorRelease(aes);
@@ -67,19 +67,19 @@ _zip_crypto_aes_new(const zip_uint8_t *key, zip_uint16_t key_size, zip_error_t *
 
     switch (ret) {
     case kCCSuccess:
-	return aes;
+        return aes;
 
     case kCCMemoryFailure:
-	zip_error_set(error, ZIP_ER_MEMORY, 0);
-	return NULL;
+        zip_error_set(error, ZIP_ER_MEMORY, 0);
+        return NULL;
 
     case kCCParamError:
-	zip_error_set(error, ZIP_ER_INVAL, 0);
-	return NULL;
+        zip_error_set(error, ZIP_ER_INVAL, 0);
+        return NULL;
 
     default:
-	zip_error_set(error, ZIP_ER_INTERNAL, 0);
-	return NULL;
+        zip_error_set(error, ZIP_ER_INTERNAL, 0);
+        return NULL;
     }
 }
 
@@ -87,7 +87,7 @@ _zip_crypto_aes_new(const zip_uint8_t *key, zip_uint16_t key_size, zip_error_t *
 void
 _zip_crypto_hmac_free(_zip_crypto_hmac_t *hmac) {
     if (hmac == NULL) {
-	return;
+        return;
     }
 
     _zip_crypto_clear(hmac, sizeof(*hmac));
@@ -100,29 +100,11 @@ _zip_crypto_hmac_new(const zip_uint8_t *secret, zip_uint64_t secret_length, zip_
     _zip_crypto_hmac_t *hmac;
 
     if ((hmac = (_zip_crypto_hmac_t *)malloc(sizeof(*hmac))) == NULL) {
-	zip_error_set(error, ZIP_ER_MEMORY, 0);
-	return NULL;
+        zip_error_set(error, ZIP_ER_MEMORY, 0);
+        return NULL;
     }
 
     CCHmacInit(hmac, kCCHmacAlgSHA1, secret, secret_length);
 
     return hmac;
-}
-
-
-ZIP_EXTERN bool
-zip_random(zip_uint8_t *buffer, zip_uint16_t length) {
-    int fd;
-
-    if ((fd = open("/dev/urandom", O_RDONLY)) < 0) {
-	return false;
-    }
-
-    if (read(fd, buffer, length) != length) {
-	close(fd);
-	return false;
-    }
-
-    close(fd);
-    return true;
 }

@@ -1,6 +1,6 @@
 /*
-  zip_source_get_compression_flags.c -- get compression flags for entry
-  Copyright (C) 2017-2018 Dieter Baron and Thomas Klausner
+  zip_mkstempm.c -- mkstemp replacement that accepts a mode argument
+  Copyright (C) 2019 Dieter Baron and Thomas Klausner
 
   This file is part of libzip, a library to manipulate ZIP archives.
   The authors can be contacted at <libzip@nih.at>
@@ -31,27 +31,63 @@
   IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <errno.h>
+#include <fcntl.h>
+#include <string.h>
+#include <sys/stat.h>
 
 #include "zipint.h"
 
-#define ZIP_COMPRESSION_BITFLAG_MAX 3
+/*
+ * create temporary file with same permissions as previous one;
+ * or default permissions if there is no previous file
+ */
+int
+_zip_mkstempm(char *path, int mode) {
+    int fd;
+    char *start, *end, *xs;
 
-zip_int8_t
-zip_source_get_compression_flags(zip_source_t *src) {
-    while (src) {
-	if ((src->supports & ZIP_SOURCE_MAKE_COMMAND_BITMASK(ZIP_SOURCE_GET_COMPRESSION_FLAGS))) {
-	    zip_int64_t ret = _zip_source_call(src, NULL, 0, ZIP_SOURCE_GET_COMPRESSION_FLAGS);
-	    if (ret < 0) {
-		return -1;
-	    }
-	    if (ret > ZIP_COMPRESSION_BITFLAG_MAX) {
-		zip_error_set(&src->error, ZIP_ER_INTERNAL, 0);
-		return -1;
-	    }
-	    return (zip_int8_t)ret;
-	}
-	src = src->src;
+    int xcnt = 0;
+
+    end = path + strlen(path);
+    start = end - 1;
+    while (start >= path && *start == 'X') {
+        xcnt++;
+        start--;
     }
 
-    return 0;
+    if (xcnt == 0) {
+        errno = EINVAL;
+        return -1;
+    }
+
+    start++;
+
+    for (;;) {
+        zip_uint32_t value = zip_random_uint32();
+
+        xs = start;
+
+        while (xs < end) {
+            char digit = value % 36;
+            if (digit < 10) {
+                *(xs++) = digit + '0';
+            }
+            else {
+                *(xs++) = digit - 10 + 'a';
+            }
+            value /= 36;
+        }
+
+        if ((fd = open(path, O_CREAT | O_EXCL | O_RDWR | O_CLOEXEC, mode == -1 ? 0666 : (mode_t)mode)) >= 0) {
+            if (mode != -1) {
+                /* open() honors umask(), which we don't want in this case */
+                (void)chmod(path, (mode_t)mode);
+            }
+            return fd;
+        }
+        if (errno != EEXIST) {
+            return -1;
+        }
+    }
 }
